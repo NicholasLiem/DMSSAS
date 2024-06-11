@@ -4,7 +4,7 @@ import aiohttp
 import base64
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes, serialization
-import sssh
+import pyshamir
 
 from transaction import Transaction
 
@@ -45,14 +45,17 @@ async def get_share(session, node_url):
 
 # Route untuk mendistribusikan secret
 @app.route('/distribute_shares', methods=['POST'])
-async def distribute_shares():
-    secret = "my_secret_key"
-    shares = shares = sssh.create(3, 2, secret)
+def distribute_shares():
+    secret = b"my_secret_key"
+    shares = pyshamir.split(secret, 3, 2)
 
-    async with aiohttp.ClientSession() as session:
-        tasks = [initialize_node(session, node_addresses[f'node{i+1}'], shares[i]) for i in range(3)]
-        responses = await asyncio.gather(*tasks)
-        return jsonify({'status': 'Shares distributed', 'responses': responses})
+    async def distribute():
+        async with aiohttp.ClientSession() as session:
+            tasks = [initialize_node(session, node_addresses[f'node{i+1}'], base64.b64encode(shares[i]).decode()) for i in range(3)]
+            responses = await asyncio.gather(*tasks)
+            return jsonify({'status': 'Shares distributed', 'responses': responses})
+
+    return asyncio.run(distribute())
 
 # Route untuk menginisialisasi node-node
 @app.route('/initialize_nodes', methods=['POST'])
@@ -97,12 +100,12 @@ async def submit_transaction():
         if valid_signatures >= 2:
             share_tasks = [get_share(session, node_url) for node_url in node_addresses.values()]
             share_responses = await asyncio.gather(*share_tasks)
-            shares = [base64.b64decode(resp['share']).decode() for resp in share_responses]
+            shares = [base64.b64decode(resp['share']) for resp in share_responses]
 
             try:
-                secret = sssh.combine(shares[:2])
+                secret = pyshamir.combine(shares[:2])
                 print(f'Reconstructed secret: {secret}')
-                return jsonify({'status': 'Transaction approved', 'secret': secret})
+                return jsonify({'status': 'Transaction approved', 'secret': secret.decode()})
             except Exception as e:
                 print(f'Failed to reconstruct secret: {e}')
                 return jsonify({'status': 'Transaction rejected', 'error': str(e)})

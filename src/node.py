@@ -3,15 +3,21 @@ import base64
 import requests
 import threading
 import time
+import os
 from cryptography.hazmat.primitives import serialization
 from node_config import NodeConfig
 from transaction import Transaction
 
 app = Flask(__name__)
 
+port = int(os.environ.get('PORT', 5001))
+
+node_id = os.environ.get('NODE_ID', 'node1')
+endpoint_url = f"http://127.0.0.1:{port}"
+
 node_config = NodeConfig(
-    node_id="node1",
-    endpoint_url="http://127.0.0.1:5001"
+    node_id=node_id,
+    endpoint_url=endpoint_url
 )
 node_config.generate_keys()
 share = None
@@ -65,4 +71,4 @@ key_rotation_thread = threading.Thread(target=rotate_keys)
 key_rotation_thread.start()
 
 if __name__ == '__main__':
-    app.run(port=5001)
+    app.run(port=port)
