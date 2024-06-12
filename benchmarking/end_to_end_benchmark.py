@@ -1,4 +1,3 @@
-import datetime
 import subprocess
 import time
 import requests
