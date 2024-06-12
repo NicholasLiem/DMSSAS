@@ -22,26 +22,41 @@ public_keys = {}
 
 # Fungsi initialize node digunakan untuk membagi secret
 async def initialize_node(session, node_url, share):
-    async with session.post(f'{node_url}/initialize', json={'share': share}) as response:
-        return await response.json()
+    try:
+        async with session.post(f'{node_url}/initialize', json={'share': share}) as response:
+            return await response.json()
+    except aiohttp.ClientError as e:
+        print(f'Error initializing node at {node_url}: {e}')
+        return {'status': 'error', 'message': str(e)}
 
 # Fungsi untuk mengambil public key dari setiap node anggota
 async def fetch_public_key(session, node_url, node_id):
-    async with session.get(f'{node_url}/public_key') as response:
-        resp = await response.json()
-        public_key_pem = base64.b64decode(resp['public_key'])
-        public_key = serialization.load_pem_public_key(public_key_pem)
-        public_keys[node_id] = public_key
+    try:
+        async with session.get(f'{node_url}/public_key') as response:
+            resp = await response.json()
+            public_key_pem = base64.b64decode(resp['public_key'])
+            public_key = serialization.load_pem_public_key(public_key_pem)
+            public_keys[node_id] = public_key
+    except aiohttp.ClientError as e:
+        print(f'Error fetching public key from {node_url}: {e}')
 
 # Fungsi untuk meminta digital signature
 async def get_signature(session, node_url, transaction):
-    async with session.post(f'{node_url}/request_signature', json={'transaction': transaction}) as response:
-        return await response.json()
+    try:
+        async with session.post(f'{node_url}/request_signature', json={'transaction': transaction}) as response:
+            return await response.json()
+    except aiohttp.ClientError as e:
+        print(f'Error getting signature from {node_url}: {e}')
+        return {'status': 'error', 'message': str(e)}
 
 # Fungsi untuk meminta secret share
 async def get_share(session, node_url):
-    async with session.post(f'{node_url}/request_share') as response:
-        return await response.json()
+    try:
+        async with session.post(f'{node_url}/request_share') as response:
+            return await response.json()
+    except aiohttp.ClientError as e:
+        print(f'Error getting share from {node_url}: {e}')
+        return {'status': 'error', 'message': str(e)}
 
 # Route untuk mendistribusikan secret
 @app.route('/distribute_shares', methods=['POST'])

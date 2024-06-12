@@ -34,7 +34,11 @@ def initialize():
 
 @app.route('/public_key', methods=['GET'])
 def public_key_endpoint():
-    return jsonify({'public_key': base64.b64encode(node_config.get_public_key_pem()).decode()})
+    try:
+        return jsonify({'public_key': base64.b64encode(node_config.get_public_key_pem()).decode()})
+    except Exception as e:
+        print(f'Error retrieving public key: {e}')
+        return jsonify({'status': 'error', 'message': str(e)})
 
 @app.route('/request_signature', methods=['POST'])
 def request_signature():
@@ -43,19 +47,26 @@ def request_signature():
     
     transaction = Transaction(**transaction_data)
     
-    private_key_pem = node_config.private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption()
-    )
-    transaction.sign_transaction(private_key_pem)
-    
-    return jsonify({'signature': transaction.signature})
+    try:
+        private_key_pem = node_config.private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+        transaction.sign_transaction(private_key_pem)
+        return jsonify({'signature': transaction.signature})
+    except Exception as e:
+        print(f'Error signing transaction: {e}')
+        return jsonify({'status': 'error', 'message': str(e)})
 
 @app.route('/request_share', methods=['POST'])
 def request_share():
     global share
-    return jsonify({'share': base64.b64encode(share).decode()})
+    try:
+        return jsonify({'share': base64.b64encode(share).decode()})
+    except Exception as e:
+        print(f'Error retrieving share: {e}')
+        return jsonify({'status': 'error', 'message': str(e)})
 
 def rotate_keys():
     while True:
