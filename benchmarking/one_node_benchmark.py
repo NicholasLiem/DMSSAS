@@ -11,8 +11,6 @@ from transaction import Transaction
 leader_url = 'http://127.0.0.1:5000'
 node_urls = {
     'node1': 'http://127.0.0.1:5001',
-    'node2': 'http://127.0.0.1:5002',
-    'node3': 'http://127.0.0.1:5003',
 }
 
 # Function to start a server

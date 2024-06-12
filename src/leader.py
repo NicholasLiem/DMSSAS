@@ -97,35 +97,56 @@ async def submit_transaction():
     transaction_data = data['transaction']
 
     async with aiohttp.ClientSession() as session:
-        tasks = [get_signature(session, node_url, transaction_data) for node_url in node_addresses.values()]
-        responses = await asyncio.gather(*tasks)
-        signatures = [resp['signature'] for resp in responses]
+        try:
+            tasks = [get_signature(session, node_url, transaction_data) for node_url in node_addresses.values()]
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
 
-        valid_signatures = 0
-        for node_id, signature in zip(public_keys.keys(), signatures):
-            transaction = Transaction(**transaction_data)
-            transaction.signature = signature
-            public_key_pem = public_keys[node_id].public_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo
-            )
-            if transaction.verify_transaction(public_key_pem):
-                valid_signatures += 1
+            signatures = []
+            for resp in responses:
+                if isinstance(resp, Exception):
+                    print(f"Exception from node: {resp}")
+                elif 'signature' in resp:
+                    signatures.append(resp['signature'])
+                else:
+                    print(f"Invalid response from node: {resp}")
 
-        if valid_signatures >= 2:
-            share_tasks = [get_share(session, node_url) for node_url in node_addresses.values()]
-            share_responses = await asyncio.gather(*share_tasks)
-            shares = [base64.b64decode(resp['share']) for resp in share_responses]
+            valid_signatures = 0
+            for node_id, signature in zip(public_keys.keys(), signatures):
+                transaction = Transaction(**transaction_data)
+                transaction.signature = signature
+                public_key_pem = public_keys[node_id].public_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo
+                )
+                if transaction.verify_transaction(public_key_pem):
+                    valid_signatures += 1
 
-            try:
-                secret = pyshamir.combine(shares[:2])
-                print(f'Reconstructed secret: {secret}')
-                return jsonify({'status': 'Transaction approved', 'secret': secret.decode()})
-            except Exception as e:
-                print(f'Failed to reconstruct secret: {e}')
-                return jsonify({'status': 'Transaction rejected', 'error': str(e)})
-        else:
-            return jsonify({'status': 'Transaction rejected'})
+            if valid_signatures >= 2:
+                share_tasks = [get_share(session, node_url) for node_url in node_addresses.values()]
+                share_responses = await asyncio.gather(*share_tasks, return_exceptions=True)
+
+                shares = []
+                for resp in share_responses:
+                    if isinstance(resp, Exception):
+                        print(f"Exception from node: {resp}")
+                    elif 'share' in resp:
+                        shares.append(base64.b64decode(resp['share']))
+                    else:
+                        print(f"Invalid response from node: {resp}")
+
+                try:
+                    secret = pyshamir.combine(shares[:2])
+                    print(f'Reconstructed secret: {secret}')
+                    return jsonify({'status': 'Transaction approved', 'secret': secret.decode()})
+                except Exception as e:
+                    print(f'Failed to reconstruct secret: {e}')
+                    return jsonify({'status': 'Transaction rejected', 'error': str(e)})
+            else:
+                return jsonify({'status': 'Transaction rejected', 'error': f'Insufficient valid signatures, total: {valid_signatures}'})
+        
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            return jsonify({'status': 'Transaction rejected', 'error': 'Unexpected error'})
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

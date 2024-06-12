@@ -12,7 +12,6 @@ leader_url = 'http://127.0.0.1:5000'
 node_urls = {
     'node1': 'http://127.0.0.1:5001',
     'node2': 'http://127.0.0.1:5002',
-    'node3': 'http://127.0.0.1:5003',
 }
 
 # Function to start a server
@@ -41,6 +40,14 @@ def benchmark_submit_transaction(transaction_data):
     submit_transaction_time = time.time() - start_time
     print(f'Transaction Submission Time: {submit_transaction_time:.2f} seconds')
     print(response.json())
+    try:
+        response_json = response.json()
+        if response_json['status'] == 'Transaction rejected':
+            print('Reason for rejection:', response_json.get('error', 'Unknown error'))
+        return response_json
+    except ValueError:
+        print('Invalid JSON response')
+        return {'status': 'error', 'message': 'Invalid JSON response'}
 
 benchmark_init_and_distribute()
 
